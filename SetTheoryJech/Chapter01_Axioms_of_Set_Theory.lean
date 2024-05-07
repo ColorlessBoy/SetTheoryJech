@@ -622,4 +622,357 @@ theorem none_empty_inminimal_of_none_empty_member_of_indN: ∀ X ⊆ indN, X ≠
   intro hn
   exfalso
   exact ZFSet.not_mem_empty _ hn
+
+-- 1.8
+theorem inductive_of_empty_and_next {X : ZFSet} (h1 : inductiveSet X) : inductiveSet (ZFSet.sep (fun (x: ZFSet) ↦ x = ∅ ∨ ∃ y ∈ X, x = y ∪ {y}) X) := by
+  unfold inductiveSet
+  constructor
+  · rw [mem_sep]
+    constructor
+    · exact h1.left
+    left
+    rfl
+  intro x
+  rw [mem_sep, mem_sep]
+  rintro ⟨hx1, hx2⟩
+  constructor
+  · apply h1.right
+    rcases hx2 with hx2 | hx2
+    · rw [hx2]
+      exact h1.left
+    obtain ⟨y, ⟨hy1, hy2⟩⟩ := hx2
+    rw [hy2]
+    exact h1.right _ hy1
+  rcases hx2 with hx2 | _
+  · right
+    use ∅
+    apply And.intro h1.left
+    rw [hx2]
+  right
+  use x
+
+-- 1.9
+theorem induction_theorem {A : ZFSet} (h1 : A ⊆ indN) (h2: ∅ ∈ A) (h3: ∀ a ∈ A, a ∪ {a} ∈ A) : A = indN := by
+  have h4: inductiveSet A := by
+    unfold inductiveSet
+    exact ⟨h2, h3⟩
+  have h5: indN ⊆ A := by
+    intro x hx
+    unfold indN at hx
+    rw [mem_sep] at hx
+    exact hx.right _ h4
+  ext x
+  constructor
+  · intro hx
+    exact h1 hx
+  intro hx
+  exact h5 hx
+
+--1.10
+def subMaximal(X: ZFSet) := ZFSet.sep (fun x ↦ ¬ ∃ s ∈ X, x ⊆ s ∧ x ≠ s) X
+def tFiniteSet (S : ZFSet) : Prop := ∀ x, x ≠ ∅ → x ⊆ ZFSet.powerset S → subMaximal x ≠ ∅
+theorem empty_in_power_empty : ∀ x ∈ ZFSet.powerset ∅, x = ∅ := by
+  intro x hx
+  rw [ZFSet.mem_powerset] at hx
+  rw [ZFSet.ext_iff]
+  intro z
+  constructor
+  · intro zx
+    exact hx zx
+  intro z0
+  exfalso
+  exact ZFSet.not_mem_empty _ z0
+theorem sub_of_power_empty {x : ZFSet} (h1: x ≠ ∅) (h2: x ⊆ ZFSet.powerset ∅) : x = {∅} := by
+  rw [ZFSet.ext_iff]
+  intro z
+  rw [ZFSet.mem_singleton]
+  constructor
+  · intro zx
+    exact empty_in_power_empty _ (h2 zx)
+  intro zx
+  rw [zx]
+  contrapose! h1
+  rw [ZFSet.ext_iff]
+  intro s
+  constructor
+  · intro sx
+    obtain hs:= empty_in_power_empty _ (h2 sx)
+    rw [hs] at sx
+    exfalso
+    exact h1 sx
+  intro s0
+  exfalso
+  exact ZFSet.not_mem_empty _ s0
+theorem tfinite_empty : tFiniteSet ∅ := by
+  unfold tFiniteSet
+  intro x hx1 hx2 hx3
+  obtain hx4 := sub_of_power_empty hx1 hx2
+  have hx5 : ∅ ∈ subMaximal x := by
+    rw [subMaximal, ZFSet.mem_sep, hx4]
+    constructor
+    · rw [mem_singleton]
+    push_neg
+    intro s hs1 _
+    rw [mem_singleton] at hs1
+    symm
+    exact hs1
+  rw [hx3] at hx5
+  exact ZFSet.not_mem_empty _ hx5
+theorem not_empty_to_exist {x : ZFSet} : x ≠ ∅ ↔ ∃ y, y ∈ x := by
+  constructor
+  · intro h
+    contrapose! h
+    rw [ZFSet.ext_iff]
+    intro z
+    constructor
+    · intro hz
+      exfalso
+      exact h _ hz
+    intro hz
+    exfalso
+    exact ZFSet.not_mem_empty _ hz
+  intro h
+  contrapose! h
+  rw [h]
+  exact ZFSet.not_mem_empty
+theorem tfinite_n_of_indN : ZFSet.sep (fun n ↦ tFiniteSet n) indN = indN := by
+  apply induction_theorem _ _ _
+  · intro x hx
+    rw [mem_sep] at hx
+    exact hx.left
+  · rw [mem_sep]
+    exact ⟨inductive_of_indN.left, tfinite_empty⟩
+  rintro s hs
+  rw [mem_sep] at hs
+  obtain ⟨hs1, hs2⟩ := hs
+  rw [mem_sep]
+  constructor
+  · exact inductive_of_indN.right _ hs1
+  rw [tFiniteSet]
+  intro x hx1 hx2
+  by_cases hx3: x ⊆ powerset s
+  · exact hs2 _ hx1 hx3
+  have hx4 : ∃ a ∈ x, s ∈ a := by
+    contrapose! hx3
+    intro a ha1
+    obtain ha2 := hx3 _ ha1
+    obtain ha3 := hx2 ha1
+    rw [ZFSet.mem_powerset]
+    rw [ZFSet.mem_powerset] at ha3
+    intro b hb1
+    obtain hb2 := ha3 hb1
+    rw [ZFSet.mem_union] at hb2
+    rcases hb2 with hb2 | hb2
+    · exact hb2
+    rw [ZFSet.mem_singleton] at hb2
+    exfalso
+    rw [hb2] at hb1
+    exact ha2 hb1
+  obtain ⟨b, ⟨hb1, hb2⟩⟩ := hx4
+  have hb3 {b:ZFSet} (h : b ∈ x) : b \ {s} ∈ powerset s := by
+    rw [ZFSet.mem_powerset]
+    intro c hc1
+    rw [ZFSet.mem_diff] at hc1
+    obtain hb3 := hx2 h
+    rw [ZFSet.mem_powerset] at hb3
+    obtain hc2 := hb3 hc1.left
+    rw [ZFSet.mem_union] at hc2
+    rcases hc2 with hc2 | hc2
+    · exact hc2
+    exfalso
+    exact hc1.right hc2
+  have hb4 {b:ZFSet} (h : s ∈ b) : b \ {s} ∪ {s} = b := by
+    rw [ZFSet.ext_iff]
+    intro c
+    rw [ZFSet.mem_union, ZFSet.mem_diff]
+    constructor
+    · rintro (⟨hc1, _⟩ | hc2)
+      exact hc1
+      rw [ZFSet.mem_singleton] at hc2
+      rw [← hc2] at h
+      exact h
+    intro hc1
+    rw [ZFSet.mem_singleton]
+    by_cases hc2 : c = s
+    · right
+      exact hc2
+    left
+    exact ⟨hc1, hc2⟩
+  let y := ZFSet.sep (fun a ↦ a ∈ x ∨ a ∪ {s} ∈ x) (powerset s)
+  have hy1 {b:ZFSet} (h1 : b ∈ x) (h2 : s ∈ b): b \ {s} ∈ y := by
+    rw [ZFSet.mem_sep]
+    constructor
+    · exact hb3 h1
+    right
+    rw [hb4 h2]
+    exact h1
+  have hy2: y ≠ ∅ := by
+    apply not_empty_to_exist.mpr
+    use b \ {s}
+    exact hy1 hb1 hb2
+  have hy3: y ⊆ powerset s := by
+    intro a ha1
+    rw [ZFSet.mem_sep] at ha1
+    exact ha1.left
+  obtain hy4 := hs2 _ hy2 hy3
+  obtain ⟨c, hc⟩ := not_empty_to_exist.mp hy4
+  rw [subMaximal, ZFSet.mem_sep] at hc
+  obtain ⟨hc1, hc2⟩ := hc
+  rw [ZFSet.mem_sep] at hc1
+  obtain ⟨hc3, hc4⟩ := hc1
+  push_neg at hc2
+  apply not_empty_to_exist.mpr
+  rcases hc4 with hc4 | hc4
+  · by_cases hc5 : c ∪ {s} ∈ x
+    · use c ∪ {s}
+      rw [subMaximal, ZFSet.mem_sep]
+      apply And.intro hc5
+      push_neg
+      intro d hd1 hd2
+      have hd3 : s ∈ d := by
+        apply hd2
+        rw [ZFSet.mem_union, ZFSet.mem_singleton]
+        right
+        rfl
+      obtain hd4 := hy1 hd1 hd3
+      obtain hd5 := hc2 _ hd4
+      have hd6 : c ⊆ d \ {s} := by
+        intro e he
+        rw [ZFSet.mem_diff]
+        constructor
+        · apply hd2
+          rw [ZFSet.mem_union]
+          left
+          exact he
+        rw [ZFSet.mem_singleton]
+        intro he2
+        rw [he2] at he
+        rw [ZFSet.mem_powerset] at hc3
+        apply hc3 at he
+        exact (not_self_of_indN s hs1).left he
+      apply hd5 at hd6
+      rw [hd6]
+      apply hb4 hd3
+    use c
+    rw [subMaximal, ZFSet.mem_sep]
+    apply And.intro hc4
+    push_neg
+    intro d hd1 hd2
+    apply hc2 d _ hd2
+    rw [ZFSet.mem_sep, ZFSet.mem_powerset]
+    constructor
+    · intro e he1
+      obtain hd3 := hx2 hd1
+      rw [ZFSet.mem_powerset] at hd3
+      obtain he2 := hd3 he1
+      rw [ZFSet.mem_union] at he2
+      rcases he2 with he2 | he2
+      · exact he2
+      rw [ZFSet.mem_singleton] at he2
+      rw [he2] at he1
+      have hd4: c ⊆ d \ {s} := by
+        intro f hf1
+        rw [ZFSet.mem_diff, ZFSet.mem_singleton]
+        constructor
+        · exact hd2 hf1
+        intro hf2
+        rw [hf2] at hf1
+        rw [ZFSet.mem_powerset] at hc3
+        apply hc3 at hf1
+        exact (not_self_of_indN _ hs1).left hf1
+      have hd5: d \ {s} ∈ y := by
+        apply hy1 hd1 he1
+      apply hc2 _ hd5 at hd4
+      rw [hd4] at hc5
+      rw [hb4 he1] at hc5
+      exfalso
+      apply hc5 hd1
+    left
+    exact hd1
+  use c ∪ {s}
+  rw [subMaximal, ZFSet.mem_sep]
+  apply And.intro hc4
+  push_neg
+  intro d hd1 hd2
+  have hd3 : d \ {s} ∈ y := by
+    apply hy1 hd1
+    apply hd2
+    rw [ZFSet.mem_union, ZFSet.mem_singleton]
+    right
+    rfl
+  have hd4 : c ⊆ d \ {s} := by
+    intro e he1
+    rw [ZFSet.mem_diff, ZFSet.mem_singleton]
+    constructor
+    apply hd2
+    rw [ZFSet.mem_union]
+    left
+    exact he1
+    intro he2
+    rw [he2] at he1
+    rw [ZFSet.mem_powerset] at hc3
+    apply hc3 at he1
+    exact (not_self_of_indN _ hs1).left he1
+  obtain hd5 := hc2 _ hd3 hd4
+  rw [hd5]
+  apply hb4
+  apply hd2
+  rw [ZFSet.mem_union, ZFSet.mem_singleton]
+  right
+  rfl
+
+-- 1.11.1
+theorem not_tfinite_indN : ¬ tFiniteSet indN := by
+  rw [tFiniteSet]
+  push_neg
+  use indN
+  constructor
+  · apply not_empty_to_exist.mpr
+    use ∅
+    apply inductive_of_indN.left
+  constructor
+  · intro n hn
+    rw [ZFSet.mem_powerset]
+    exact transitive_of_indN _ hn
+  rw [ZFSet.ext_iff]
+  intro n
+  constructor
+  intro hn
+  rw [subMaximal, ZFSet.mem_sep] at hn
+  obtain ⟨hn1, hn2⟩ := hn
+  exfalso
+  apply hn2
+  use n ∪ {n}
+  constructor
+  · apply inductive_of_indN.right _ hn1
+  constructor
+  · intro x hx
+    rw [ZFSet.mem_union]
+    left
+    exact hx
+  apply (not_self_of_indN _ hn1).right
+  intro hn
+  exfalso
+  exact ZFSet.not_mem_empty _ hn
+-- 1.11.2
+theorem empty_subMaximal_indN : subMaximal indN = ∅ := by
+  rw [ZFSet.ext_iff]
+  intro n
+  rw [subMaximal, mem_sep]
+  constructor
+  · rintro ⟨hn1, hn2⟩
+    exfalso
+    apply hn2
+    use n ∪ {n}
+    constructor
+    · apply inductive_of_indN.right _ hn1
+    constructor
+    · intro x hx
+      rw [ZFSet.mem_union]
+      left
+      exact hx
+    apply (not_self_of_indN _ hn1).right
+  intro hn
+  exfalso
+  exact ZFSet.not_mem_empty _ hn
 end
