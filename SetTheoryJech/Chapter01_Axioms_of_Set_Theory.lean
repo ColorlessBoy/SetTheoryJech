@@ -976,3 +976,149 @@ theorem empty_subMaximal_indN : subMaximal indN = ∅ := by
   exfalso
   exact ZFSet.not_mem_empty _ hn
 end
+
+-- 1.12
+def isFunc (f: ZFSet) (X: ZFSet) (Y: ZFSet) := ∀ x ∈ X, ∃! y ∈ Y, x.pair y ∈ f
+def injective (f: ZFSet) (X: ZFSet) (Y: ZFSet) := ∀ x₁ ∈ X, ∀ y₁ ∈ Y, ∀ x₂ ∈ X, ∀ y₂ ∈ Y, (x₁.pair y₁) ∈ f → (x₂.pair y₂) ∈ f → y₁ = y₂ → x₁ = x₂
+def surjective (f: ZFSet) (X: ZFSet) (Y: ZFSet) := ∀ y ∈ Y, ∃ x ∈ X, x.pair y ∈ f
+def finiteSet (X: ZFSet) := ∃ Y ∈ indN, ∃ f, (isFunc f X Y) ∧ (injective f X Y)
+def preimage (f: ZFSet) (X: ZFSet) (Y: ZFSet) := ZFSet.sep (fun x ↦ ∃ y ∈ Y, x.pair y ∈ f) X
+def image (f: ZFSet) (X: ZFSet) (Y: ZFSet) := ZFSet.sep (fun y ↦ ∃ x ∈ X, x.pair y ∈ f) Y
+
+theorem finite_to_tfinite (h: finiteSet S) : tFiniteSet S := by
+  rw [tFiniteSet]
+  intro PX hPX1 hPX2
+  apply not_empty_to_exist.mpr
+  obtain ⟨Y, ⟨hY, ⟨F, ⟨hF1, hF2⟩⟩⟩⟩ := h
+  let imgPX := ZFSet.sep (fun t ↦ (preimage F S t) ∈ PX ∧ image F (preimage F S t) Y = t) (ZFSet.powerset Y)
+  have eqhpx {px: ZFSet} (hpx: px ∈ PX) : preimage F S (image F px Y) = px := by
+    rw [ZFSet.ext_iff]
+    intro z
+    rw [preimage, ZFSet.mem_sep]
+    constructor
+    · rintro ⟨hz1, ⟨w, ⟨hw1, hw2⟩⟩⟩
+      rw [image, ZFSet.mem_sep] at hw1
+      obtain ⟨hw3, ⟨a, ha⟩⟩ := hw1
+      have : z = a := by
+        apply hF2 _ hz1 _ hw3 _ _ _ hw3 hw2 ha.right
+        rfl
+        obtain tmp1 := hPX2 hpx
+        rw [ZFSet.mem_powerset] at tmp1
+        exact tmp1 ha.left
+      rw [this]
+      exact ha.left
+    intro hz
+    obtain tmp1 := hPX2 hpx
+    rw [ZFSet.mem_powerset] at tmp1
+    apply And.intro (tmp1 hz)
+    obtain ⟨yz, hyz, _⟩ := hF1 _ (tmp1 hz)
+    use yz
+    apply And.intro _ hyz.right
+    rw [image, ZFSet.mem_sep]
+    apply And.intro hyz.left
+    use z
+    exact ⟨hz, hyz.right⟩
+  have himgPX1 : imgPX ≠ ∅ := by
+    rw [not_empty_to_exist] at hPX1
+    obtain ⟨px, hpx⟩ := hPX1
+    rw [not_empty_to_exist]
+    use image F px Y
+    rw [ZFSet.mem_sep]
+    constructor
+    · rw [ZFSet.mem_powerset]
+      intro t ht
+      rw [image, ZFSet.mem_sep] at ht
+      exact ht.left
+    rw [eqhpx hpx]
+    exact ⟨hpx, rfl⟩
+  have himgPX2 : imgPX ⊆ ZFSet.powerset Y := by
+    intro y hy
+    rw [ZFSet.mem_sep] at hy
+    exact hy.left
+  have hY2 : tFiniteSet Y := by
+    rw [← tfinite_n_of_indN, ZFSet.mem_sep] at hY
+    exact hY.right
+  obtain himgS3 := hY2 _ himgPX1 himgPX2
+  rw [not_empty_to_exist] at himgS3
+  obtain ⟨subY, hsubY⟩ := himgS3
+  rw [subMaximal, ZFSet.mem_sep, ZFSet.mem_sep] at hsubY
+  obtain ⟨⟨hsubY1, hsubY2, hsubY4⟩, hsubY3⟩ := hsubY
+  use preimage F S subY
+  rw [subMaximal, ZFSet.mem_sep]
+  constructor
+  · exact hsubY2
+  contrapose! hsubY3
+  obtain ⟨s, ⟨hs1, hs2, hs3⟩⟩ := hsubY3
+  use image F s Y
+  constructor
+  · rw [ZFSet.mem_sep, ZFSet.mem_powerset]
+    constructor
+    · intro t ht
+      rw [image, ZFSet.mem_sep] at ht
+      exact ht.left
+    have : preimage F S (image F s Y) = s := by
+      rw [ZFSet.ext_iff]
+      intro t
+      constructor
+      · intro ht
+        rw [preimage, ZFSet.mem_sep] at ht
+        obtain ⟨a, ha1, ha2⟩ := ht.right
+        rw [image, ZFSet.mem_sep] at ha1
+        obtain ⟨b, hb1, hb2⟩ := ha1.right
+        obtain hb3 := hPX2 hs1
+        rw [ZFSet.mem_powerset] at hb3
+        obtain hb4 := hb3 hb1
+        have : b = t := by
+          apply hF2 _ hb4 _ ha1.left _ ht.left _ ha1.left hb2 ha2
+          rfl
+        rw [← this]
+        exact hb1
+      intro ts
+      rw [preimage, ZFSet.mem_sep]
+      obtain ht1 := hPX2 hs1
+      rw [ZFSet.mem_powerset] at ht1
+      apply And.intro (ht1 ts)
+      obtain ⟨y2, ⟨hy2l, hy2r⟩, _⟩ := hF1 t (ht1 ts)
+      use y2
+      constructor
+      · rw [image, ZFSet.mem_sep]
+        apply And.intro hy2l
+        use t
+      exact hy2r
+    rw [this]
+    exact ⟨hs1, rfl⟩
+  rw [ZFSet.mem_powerset] at hsubY1
+  constructor
+  · intro t ht
+    rw [image, ZFSet.mem_sep]
+    apply And.intro (hsubY1 ht)
+    rw [← hsubY4, image, ZFSet.mem_sep] at ht
+    obtain ⟨a, ⟨ha1, ha2⟩⟩ := ht.right
+    use a
+    apply And.intro _ ha2
+    exact hs2 ha1
+  contrapose! hs3
+  rw [hs3]
+  rw [ZFSet.ext_iff]
+  intro t
+  rw [preimage, ZFSet.mem_sep]
+  obtain hs4 := hPX2 hs1
+  rw [ZFSet.mem_powerset] at hs4
+  constructor
+  · intro ⟨h1, h2⟩
+    obtain ⟨w, ⟨hw1, hw2⟩⟩ := h2
+    rw [image, ZFSet.mem_sep] at hw1
+    obtain ⟨hw3, ⟨a, ha1, ha2⟩⟩ := hw1
+    have : t = a := by apply hF2 _ h1 _ hw3 _ (hs4 ha1) _ hw3 hw2 ha2 rfl
+    rw [this]
+    exact ha1
+  intro ht
+  apply And.intro (hs4 ht)
+  obtain ⟨w, hw1, _⟩ := hF1 _ (hs4 ht)
+  use w
+  constructor
+  · rw [image, ZFSet.mem_sep]
+    apply And.intro hw1.left
+    use t
+    exact ⟨ht, hw1.right⟩
+  exact hw1.right
